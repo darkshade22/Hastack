@@ -82,6 +82,14 @@ html,body{overflow-x:clip}
 @media(max-width:360px){.about-image.about-flip{height:610px}.about-face-back{padding:25px 20px;gap:18px}.flip-back-title,[dir=rtl] .flip-back-title{font-size:28px}}
 @media(prefers-reduced-motion:reduce){.about-flip-inner,.flip-turn-icon{transition:none!important}}
 </style>
+<style>
+/* Robot launcher shares the WhatsApp corner, with a separate touch target. */
+.hastack-chat-launcher{position:fixed;inset-inline-end:24px;bottom:94px;z-index:2147483646;display:grid;place-items:center;width:58px;height:58px;border:1px solid #ffbc7e;border-radius:19px;background:linear-gradient(145deg,#ff9d37,#ff7105);color:#211307;box-shadow:0 9px 30px #0005,0 0 25px #ff7a0c30;transition:transform .2s,box-shadow .2s}
+.hastack-chat-launcher:hover{transform:translateY(-3px);box-shadow:0 12px 35px #0005,0 0 30px #ff7a0c45}.hastack-chat-launcher svg{width:32px;height:32px}.hastack-chat-launcher:focus-visible{outline:3px solid var(--ink);outline-offset:4px}.hastack-chat-launcher[hidden]{display:none}.hastack-chat-status{position:absolute;top:3px;inset-inline-end:3px;width:9px;height:9px;background:#ffddbb;border:2px solid #ff7a0c;border-radius:50%}.hastack-chat-launcher[data-ready=true] .hastack-chat-status{background:#74dc88}
+iframe[data-hastack-chat-state=collapsed]{visibility:hidden!important}
+@media(max-width:600px){.hastack-chat-launcher{inset-inline-end:17px;bottom:85px;width:56px;height:56px;border-radius:17px}}
+@media(prefers-reduced-motion:reduce){.hastack-chat-launcher{transition:none}}
+</style>
 </head>
 <body>
 <a class="skip-link" href="#main" data-i18n="skip">Aller au contenu</a>
@@ -246,5 +254,72 @@ $('#about-flip-button').addEventListener('keydown',e=>{if(e.key==='Escape')setAb
 let savedLanguage='fr';try{savedLanguage=localStorage.getItem('hastack-language')||'fr'}catch{}const queryLanguage=new URLSearchParams(location.search).get('lang');setLanguage(queryLanguage&&translations[queryLanguage]?queryLanguage:savedLanguage);
 const motionReduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if('IntersectionObserver' in window&&!motionReduced){document.documentElement.classList.add('js');const observer=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('visible');observer.unobserve(entry.target)}})},{threshold:.08});$$('.reveal').forEach(el=>observer.observe(el))}
 let framePending=false;function updateScroll(){const total=document.documentElement.scrollHeight-innerHeight;$('.scroll-progress').style.width=(total>0?scrollY/total*100:0)+'%';framePending=false}addEventListener('scroll',()=>{if(!framePending){requestAnimationFrame(updateScroll);framePending=true}},{passive:true});updateScroll();
+</script>
+<a id="hastack-chat-launcher" class="hastack-chat-launcher" href="https://www.imfa.io/embed/chatbot/k46d2be9?open=true" target="_blank" rel="noopener noreferrer" aria-label="Discuter avec notre assistant" title="Discuter avec notre assistant" data-ready="false"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 5V2m-2 0h4M7 12H4v10h3m18-10h3v10h-3"/><rect x="7" y="7" width="18" height="20" rx="6"/><circle cx="12" cy="15" r="1.2" fill="currentColor"/><circle cx="20" cy="15" r="1.2" fill="currentColor"/><path d="M12 21h8"/></svg><span class="hastack-chat-status" aria-hidden="true"></span></a>
+<!-- IMFA Agents: one asynchronous loader and a robot launcher. -->
+<script>
+(function () {
+  if (window.__hastackImfaRequested) return;
+  window.__hastackImfaRequested = true;
+  var origin = 'https://www.imfa.io';
+  var src = origin + '/embed/chatbot/loader.js';
+  var chatUrl = origin + '/embed/chatbot/k46d2be9?open=true';
+  var button = document.getElementById('hastack-chat-launcher');
+  var frame = null;
+  var opened = false;
+  var labels = {
+    fr: 'Discuter avec notre assistant',
+    en: 'Chat with our assistant',
+    ary: 'هضر مع المساعد ديالنا'
+  };
+  function updateLabel() {
+    button.setAttribute('aria-label', labels[document.documentElement.lang] || labels.fr);
+    button.title = button.getAttribute('aria-label');
+  }
+  function attachFrame() {
+    var found = document.querySelector('iframe[src="' + origin + '/embed/launcher"], iframe[src^="' + origin + '/embed/chatbot/k46d2be9"]');
+    if (!found || found === frame) return;
+    frame = found;
+    frame.setAttribute('data-hastack-chat-state', opened ? 'open' : 'collapsed');
+    button.dataset.ready = 'true';
+  }
+  button.addEventListener('click', function (event) {
+    attachFrame();
+    if (!frame || !frame.isConnected) return; // The public chat link remains usable if the embed cannot load.
+    event.preventDefault();
+    opened = true;
+    frame.setAttribute('data-hastack-chat-state', 'open');
+    button.hidden = true;
+    // Use the same destination as IMFA's native launcher; keep the original host access handshake.
+    frame.src = chatUrl;
+  });
+  window.addEventListener('message', function (event) {
+    if (!frame || event.origin !== origin || event.source !== frame.contentWindow) return;
+    var data = event.data;
+    if (!data || data.source !== 'imfa-widget') return;
+    if (typeof data.open === 'boolean') {
+      opened = data.open;
+      frame.setAttribute('data-hastack-chat-state', opened ? 'open' : 'collapsed');
+      button.hidden = opened;
+    }
+    if (data.type === 'embed-denied') {
+      button.hidden = false;
+      button.dataset.ready = 'false';
+    }
+  });
+  new MutationObserver(attachFrame).observe(document.body, {childList: true, subtree: true});
+  new MutationObserver(updateLabel).observe(document.documentElement, {attributes: true, attributeFilter: ['lang']});
+  updateLabel();
+  attachFrame();
+  if (document.querySelector('script[src="' + src + '"][data-chatbot="k46d2be9"]')) return;
+  var script = document.createElement('script');
+  script.src = src;
+  script.setAttribute('data-chatbot', 'k46d2be9');
+  script.setAttribute('data-position', 'bottom-end');
+  script.setAttribute('data-offset-x', '20');
+  script.setAttribute('data-offset-y', '84');
+  script.async = true;
+  document.body.appendChild(script);
+})();
 </script>
 </body></html>
